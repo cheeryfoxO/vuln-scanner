@@ -67,7 +67,7 @@ class TestBaselineTime:
 class TestMakeTestUrl:
     def test_replaces_get_param(self):
         result = _make_test_url("http://example.com/page?id=1", "id", "' OR 1=1--")
-        assert "id=1%27+OR+1%3D1--" in result
+        assert "id=%27+OR+1%3D1--" in result
 
     def test_adds_param_to_url_without_params(self):
         result = _make_test_url("http://example.com/page", "q", "test")
