@@ -5,7 +5,7 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from scanner.modules.base import BaseModule
-from scanner.core.html_utils import _FormParser, _extract_params, _make_test_url
+from scanner.core.html_utils import _extract_params, _make_test_url
 
 
 # ── Error-Based Payloads ────────────────────────────────────────────
@@ -116,13 +116,17 @@ class SqliModule(BaseModule):
         if not param_names:
             parsed = urllib.parse.urlparse(target)
             if parsed.query:
-                param_names = list(urllib.parse.parse_qs(parsed.query).keys())
+                param_names = [
+                    {"name": k, "method": "GET"}
+                    for k in urllib.parse.parse_qs(parsed.query).keys()
+                ]
 
         if not param_names:
             output.log_progress("No testable parameters found on this page")
             return {"module": self.name, "findings": []}
 
-        output.log_progress(f"Found {len(param_names)} potential parameters: {param_names}")
+        param_list = [f"{p['name']}({p['method']})" for p in param_names]
+        output.log_progress(f"Found {len(param_names)} potential parameters: {param_list}")
 
         findings = []
         time_based_targets = []
@@ -132,12 +136,21 @@ class SqliModule(BaseModule):
         output.log_progress(f"Phase 1: Error-based testing ({len(ERROR_PAYLOADS)} payloads)")
         with ThreadPoolExecutor(max_workers=3) as pool:
             futures = {}
-            for pname in param_names:
+            for entry in param_names:
+                pname = entry["name"]
+                method = entry["method"]
                 for error_payload in ERROR_PAYLOADS:
-                    test_url = _make_test_url(target, pname, error_payload)
-                    futures[pool.submit(request_handler.get, test_url)] = (
-                        pname, error_payload, test_url
-                    )
+                    if method == "POST":
+                        test_url = target
+                        futures[pool.submit(
+                            request_handler.post, target,
+                            data={pname: error_payload}
+                        )] = (pname, error_payload, test_url)
+                    else:
+                        test_url = _make_test_url(target, pname, error_payload)
+                        futures[pool.submit(
+                            request_handler.get, test_url
+                        )] = (pname, error_payload, test_url)
 
             bar = output.create_progress_bar("Error-Based", len(futures))
             for future in as_completed(futures):
@@ -166,9 +179,9 @@ class SqliModule(BaseModule):
             bar.close()
 
         # Determine which params need Phase 2
-        for pname in param_names:
-            if pname not in param_has_error:
-                time_based_targets.append(pname)
+        for entry in param_names:
+            if entry["name"] not in param_has_error:
+                time_based_targets.append(entry)
 
         # Phase 2: Time-based blind for params without error matches
         if time_based_targets:
@@ -179,23 +192,44 @@ class SqliModule(BaseModule):
             with ThreadPoolExecutor(max_workers=3) as pool:
                 # Compute baseline for each parameter
                 param_baselines = {}
-                for pname in time_based_targets:
-                    base_url = _make_test_url(target, pname, "1")
-                    baseline = _build_baseline_time(base_url, request_handler.get)
+                for entry in time_based_targets:
+                    pname = entry["name"]
+                    if entry["method"] == "POST":
+                        baseline = _build_baseline_time(
+                            target,
+                            lambda u, n=pname: request_handler.post(u, data={n: "1"})
+                        )
+                    else:
+                        base_url = _make_test_url(target, pname, "1")
+                        baseline = _build_baseline_time(base_url, request_handler.get)
                     param_baselines[pname] = baseline
                     output.log_progress(f"  {pname} baseline: {baseline*1000:.0f}ms")
 
                 # Test sleep payloads
                 futures = {}
-                for pname in time_based_targets:
+                for entry in time_based_targets:
+                    pname = entry["name"]
                     for sp in SLEEP_PAYLOADS:
-                        test_url = _make_test_url(target, pname, sp["payload"])
-                        futures[pool.submit(
-                            self._timed_request, request_handler.get, test_url
-                        )] = (
-                            pname, sp["db"], sp["payload"], test_url,
-                            param_baselines[pname],
-                        )
+                        if entry["method"] == "POST":
+                            test_url = target
+                            futures[pool.submit(
+                                self._timed_request,
+                                lambda u, n=pname, pl=sp["payload"]: (
+                                    request_handler.post(u, data={n: pl})
+                                ),
+                                target
+                            )] = (
+                                pname, sp["db"], sp["payload"], test_url,
+                                param_baselines[pname],
+                            )
+                        else:
+                            test_url = _make_test_url(target, pname, sp["payload"])
+                            futures[pool.submit(
+                                self._timed_request, request_handler.get, test_url
+                            )] = (
+                                pname, sp["db"], sp["payload"], test_url,
+                                param_baselines[pname],
+                            )
 
                 bar = output.create_progress_bar("Time-Based", len(futures))
                 for future in as_completed(futures):
