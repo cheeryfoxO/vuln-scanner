@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 
 from scanner.modules.base import BaseModule
 from scanner.core.html_utils import _extract_params, _make_test_url
+from scanner.core.encoding import generate_variants, XSS_TECHNIQUES
 
 
 # ── XSS Payloads ─────────────────────────────────────────────────────
@@ -179,10 +180,11 @@ class XssModule(BaseModule):
         )
 
         findings = []
-        total_tests = len(param_names) * len(XSS_PAYLOADS)
+        variants_per = 1 + len(XSS_TECHNIQUES)
+        total_tests = len(param_names) * len(XSS_PAYLOADS) * variants_per
         output.log_progress(
             f"Testing {len(param_names)} params x {len(XSS_PAYLOADS)} payloads "
-            f"= {total_tests} requests"
+            f"x ~{variants_per} variants = ~{total_tests} requests"
         )
 
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -192,21 +194,22 @@ class XssModule(BaseModule):
                 method = param_entry["method"]
                 for xss_entry in XSS_PAYLOADS:
                     payload = xss_entry["payload"]
-                    if method == "POST":
-                        test_url = target
-                        futures[pool.submit(
-                            request_handler.post, target,
-                            data={pname: payload}
-                        )] = (pname, payload, test_url)
-                    else:
-                        test_url = _make_test_url(target, pname, payload)
-                        futures[pool.submit(
-                            request_handler.get, test_url
-                        )] = (pname, payload, test_url)
+                    for encoded, tech in generate_variants(payload, XSS_TECHNIQUES):
+                        if method == "POST":
+                            test_url = target
+                            futures[pool.submit(
+                                request_handler.post, target,
+                                data={pname: encoded}
+                            )] = (pname, payload, test_url, tech)
+                        else:
+                            test_url = _make_test_url(target, pname, encoded)
+                            futures[pool.submit(
+                                request_handler.get, test_url
+                            )] = (pname, payload, test_url, tech)
 
             bar = output.create_progress_bar("XSS", len(futures))
             for future in as_completed(futures):
-                pname, payload, test_url = futures[future]
+                pname, payload, test_url, tech = futures[future]
                 try:
                     resp = future.result()
                     context = _analyze_reflection(resp.text, payload)
@@ -217,9 +220,10 @@ class XssModule(BaseModule):
                             "url": test_url,
                             "payload": payload,
                             "context": context,
+                            "encoding": tech,
                             "evidence": (
                                 f"payload reflected as '{context}' "
-                                f"in response"
+                                f"in response (encoding: {tech})"
                             ),
                         }
                         findings.append(finding)
