@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from scanner.modules.base import BaseModule
 from scanner.core.html_utils import _extract_params, _make_test_url
+from scanner.core.encoding import generate_variants, SQLI_TECHNIQUES
 
 
 # ── Error-Based Payloads ────────────────────────────────────────────
@@ -140,21 +141,22 @@ class SqliModule(BaseModule):
                 pname = entry["name"]
                 method = entry["method"]
                 for error_payload in ERROR_PAYLOADS:
-                    if method == "POST":
-                        test_url = target
-                        futures[pool.submit(
-                            request_handler.post, target,
-                            data={pname: error_payload}
-                        )] = (pname, error_payload, test_url)
-                    else:
-                        test_url = _make_test_url(target, pname, error_payload)
-                        futures[pool.submit(
-                            request_handler.get, test_url
-                        )] = (pname, error_payload, test_url)
+                    for encoded, tech in generate_variants(error_payload, SQLI_TECHNIQUES):
+                        if method == "POST":
+                            test_url = target
+                            futures[pool.submit(
+                                request_handler.post, target,
+                                data={pname: encoded}
+                            )] = (pname, error_payload, test_url, tech)
+                        else:
+                            test_url = _make_test_url(target, pname, encoded)
+                            futures[pool.submit(
+                                request_handler.get, test_url
+                            )] = (pname, error_payload, test_url, tech)
 
             bar = output.create_progress_bar("Error-Based", len(futures))
             for future in as_completed(futures):
-                pname, payload, test_url = futures[future]
+                pname, payload, test_url, tech = futures[future]
                 try:
                     resp = future.result()
                     match = _check_error_patterns(resp.text)
@@ -166,9 +168,10 @@ class SqliModule(BaseModule):
                                 "parameter": pname,
                                 "url": test_url,
                                 "database": match["db"],
+                                "encoding": tech,
                                 "evidence": (
                                     f"DB error keyword '{match['keyword']}' "
-                                    f"found in response"
+                                    f"found in response (encoding: {tech})"
                                 ),
                             }
                             findings.append(finding)
@@ -210,30 +213,31 @@ class SqliModule(BaseModule):
                 for entry in time_based_targets:
                     pname = entry["name"]
                     for sp in SLEEP_PAYLOADS:
-                        if entry["method"] == "POST":
-                            test_url = target
-                            futures[pool.submit(
-                                self._timed_request,
-                                lambda u, n=pname, pl=sp["payload"]: (
-                                    request_handler.post(u, data={n: pl})
-                                ),
-                                target
-                            )] = (
-                                pname, sp["db"], sp["payload"], test_url,
-                                param_baselines[pname],
-                            )
-                        else:
-                            test_url = _make_test_url(target, pname, sp["payload"])
-                            futures[pool.submit(
-                                self._timed_request, request_handler.get, test_url
-                            )] = (
-                                pname, sp["db"], sp["payload"], test_url,
-                                param_baselines[pname],
-                            )
+                        for encoded, tech in generate_variants(sp["payload"], SQLI_TECHNIQUES):
+                            if entry["method"] == "POST":
+                                test_url = target
+                                futures[pool.submit(
+                                    self._timed_request,
+                                    lambda u, n=pname, pl=encoded: (
+                                        request_handler.post(u, data={n: pl})
+                                    ),
+                                    target
+                                )] = (
+                                    pname, sp["db"], sp["payload"], test_url,
+                                    param_baselines[pname], tech,
+                                )
+                            else:
+                                test_url = _make_test_url(target, pname, encoded)
+                                futures[pool.submit(
+                                    self._timed_request, request_handler.get, test_url
+                                )] = (
+                                    pname, sp["db"], sp["payload"], test_url,
+                                    param_baselines[pname], tech,
+                                )
 
                 bar = output.create_progress_bar("Time-Based", len(futures))
                 for future in as_completed(futures):
-                    pname, db, payload, test_url, baseline = futures[future]
+                    pname, db, payload, test_url, baseline, tech = futures[future]
                     try:
                         elapsed = future.result()
                         threshold = max(baseline * 3, DEFAULT_THRESHOLD)
@@ -243,11 +247,13 @@ class SqliModule(BaseModule):
                                 "parameter": pname,
                                 "url": test_url,
                                 "database": db,
+                                "encoding": tech,
                                 "baseline_ms": round(baseline * 1000),
                                 "response_ms": round(elapsed * 1000),
                                 "evidence": (
                                     f"Response delayed {elapsed*1000:.0f}ms "
-                                    f"vs baseline {baseline*1000:.0f}ms"
+                                    f"vs baseline {baseline*1000:.0f}ms "
+                                    f"(encoding: {tech})"
                                 ),
                             }
                             findings.append(finding)
