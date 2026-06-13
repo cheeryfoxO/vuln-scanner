@@ -82,6 +82,17 @@ class Output:
         elif module_name == "stored_xss":
             print(f"[{module_name}] {finding['payload_uid']}: "
                   f"{finding['injected_field']} → {finding['found_on']}")
+        elif module_name == "cmdi":
+            os_name = finding.get("os", "?")
+            param = finding.get("parameter", "?")
+            enc = finding.get("encoding", "")
+            enc_str = f" [{enc}]" if enc and enc != "plain" else ""
+            if finding.get("type") == "time_based":
+                print(f"[{module_name}] {finding['type']} ({os_name}): {param}{enc_str} "
+                      f"-- {finding.get('response_ms', '?')}ms -- {finding.get('url', '')}")
+            else:
+                print(f"[{module_name}] {finding['type']} ({os_name}): {param}{enc_str} "
+                      f"-- {finding.get('url', '')}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
