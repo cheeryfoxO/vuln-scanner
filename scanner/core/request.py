@@ -51,3 +51,7 @@ class RequestHandler:
     def head(self, url, **kwargs):
         """HEAD request with automatic UA and timeout."""
         return self.session.head(url, **self._prepare(kwargs))
+
+    def post(self, url, data=None, **kwargs):
+        """POST request with automatic UA and timeout."""
+        return self.session.post(url, data=data, **self._prepare(kwargs))

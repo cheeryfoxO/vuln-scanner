@@ -22,3 +22,18 @@ def test_user_agents_non_empty():
 def test_session_created():
     rh = RequestHandler()
     assert rh.session is not None
+
+
+class TestPost:
+    def test_post_method_exists(self):
+        rh = RequestHandler()
+        assert hasattr(rh, "post")
+        assert callable(rh.post)
+
+    def test_post_accepts_data(self):
+        rh = RequestHandler()
+        import inspect
+        sig = inspect.signature(rh.post)
+        params = list(sig.parameters.keys())
+        assert "url" in params
+        assert "data" in params
