@@ -5,6 +5,7 @@ import sys
 from scanner.core.engine import Engine
 from scanner.core.request import RequestHandler
 from scanner.core.output import Output
+from scanner.core.report import generate_html
 from scanner.modules.subdomain import SubdomainModule
 from scanner.modules.dirscan import DirscanModule
 from scanner.modules.params import ParamsModule
@@ -40,6 +41,7 @@ def _build_parser():
     scan.add_argument("-t", "--threads", type=int, default=10,
                       help="Concurrency hint (default: 10)")
     scan.add_argument("-o", "--output", help="Save JSON report to file")
+    scan.add_argument("-r", "--report", help="Save HTML report to file")
     scan.add_argument("-v", "--verbose", action="store_true", help="Verbose progress output")
     scan.add_argument("--timeout", type=int, default=10, help="Request timeout in seconds")
     scan.add_argument("--no-color", action="store_true", help="Disable colored output")
@@ -127,7 +129,13 @@ def main():
     # Write JSON report
     if args.output:
         output.write_report(args.target, report["modules"])
-        print(f"\nReport saved to {args.output}")
+        print(f"\nJSON report saved to {args.output}")
+
+    # Write HTML report
+    report_path = getattr(args, "report", None)
+    if report_path:
+        generate_html(args.target, report, report_path)
+        print(f"HTML report saved to {report_path}")
 
     # Summary
     total = sum(len(v) for v in report["findings"].values())
