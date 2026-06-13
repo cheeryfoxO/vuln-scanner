@@ -61,7 +61,15 @@ class Output:
             print(f"[{module_name}] {self._color(code)}{finding['host']}{self._reset()} - {code} - {finding.get('title', '')}")
         elif module_name == "dirscan":
             code = finding.get("status", 0)
-            print(f"[{module_name}] {self._color(code)}{code}{self._reset()} - {finding['url']} ({finding.get('size', 0)}B)")
+            severity = finding.get("severity")
+            if severity:
+                sev_color = Fore.RED if severity == "critical" else Fore.YELLOW
+                print(f"[{module_name}] {self._color(code)}{code}{self._reset()} - "
+                      f"{finding['url']} {sev_color}[{severity}]{self._reset()} — "
+                      f"{finding.get('sensitive', '')}")
+            else:
+                print(f"[{module_name}] {self._color(code)}{code}{self._reset()} - "
+                      f"{finding['url']} ({finding.get('size', 0)}B)")
         elif module_name == "params":
             print(f"[{module_name}] {finding['type']}: {finding['source']}")
         elif module_name == "xss":

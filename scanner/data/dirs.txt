@@ -246,3 +246,79 @@ privacy/
 policy/
 tos/
 legal/
+# ── Backup extensions ──────────────────────────
+wp-config.php.bak
+wp-config.php.old
+wp-config.php.save
+wp-config.php.swp
+wp-config.php.orig
+wp-config.php.copy
+wp-config.php.tmp
+wp-config.php~
+config.php.bak
+config.php~
+database.yml.bak
+database.yml.old
+# ── Version control internals ──────────────────
+.git/config
+.git/HEAD
+.svn/entries
+.svn/wc.db
+.hg/store/
+.CVS/
+.bzr/
+# ── SSH keys ───────────────────────────────────
+id_rsa
+id_rsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+known_hosts
+authorized_keys
+.pem
+key.pem
+# ── CI/CD ──────────────────────────────────────
+.travis.yml
+Jenkinsfile
+.circleci/config.yml
+.drone.yml
+.gitlab-ci.yml
+# ── Shell history ──────────────────────────────
+.bash_history
+.bashrc
+.zshrc
+.zsh_history
+.profile
+.mysql_history
+.psql_history
+# ── Database exports ───────────────────────────
+dump.sql.gz
+database.sql
+export.sql
+db_backup.sql
+# ── Extra configs ──────────────────────────────
+wp-config.php.inc
+settings.php
+config.local.php
+config.production.php
+.htpasswd
+crontab
+# ── Debug / info pages ─────────────────────────
+phpinfo.php
+debug.php
+php_info.php
+# ── Sensitive dirs ─────────────────────────────
+.git/
+.svn/
+.node_modules/
+.bzr/
+.cvs/
+.hg/
+# ── Dev tooling ────────────────────────────────
+phpunit.xml
+codeception.yml
+.env.testing
+.env.dusk
+.vscode/
+.idea/
