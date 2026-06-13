@@ -136,6 +136,17 @@ class Output:
             print(f"[{module_name}] {sev_color}{sev}{self._reset()} — "
                   f"{finding.get('origin', '?')} → {finding.get('url', '')}"
                   f"{' [creds]' if finding.get('acac') else ''}")
+        elif module_name == "ssti":
+            engine = finding.get("engine", "?")
+            param = finding.get("parameter", "?")
+            enc = finding.get("encoding", "")
+            enc_str = f" [{enc}]" if enc and enc != "plain" else ""
+            if finding.get("type") == "time_based":
+                print(f"[{module_name}] {finding['type']} ({engine}): {param}{enc_str} "
+                      f"-- {finding.get('response_ms', '?')}ms")
+            else:
+                print(f"[{module_name}] {finding['type']} ({engine}): {param}{enc_str} "
+                      f"-- {finding.get('url', '')}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""

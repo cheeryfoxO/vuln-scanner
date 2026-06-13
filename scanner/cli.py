@@ -19,9 +19,10 @@ from scanner.modules.ssrf import SsrfModule
 from scanner.modules.csrf import CsrfModule
 from scanner.modules.headers import HeadersModule
 from scanner.modules.cors import CorsModule
+from scanner.modules.ssti import SstiModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule, SstiModule]
 
 
 def _build_parser():
