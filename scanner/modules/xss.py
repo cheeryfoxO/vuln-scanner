@@ -164,14 +164,18 @@ class XssModule(BaseModule):
         if not param_names:
             parsed = urllib.parse.urlparse(target)
             if parsed.query:
-                param_names = list(urllib.parse.parse_qs(parsed.query).keys())
+                param_names = [
+                    {"name": k, "method": "GET"}
+                    for k in urllib.parse.parse_qs(parsed.query).keys()
+                ]
 
         if not param_names:
             output.log_progress("No testable parameters found on this page")
             return {"module": self.name, "findings": []}
 
+        param_list = [f"{p['name']}({p['method']})" for p in param_names]
         output.log_progress(
-            f"Found {len(param_names)} potential parameters: {param_names}"
+            f"Found {len(param_names)} potential parameters: {param_list}"
         )
 
         findings = []
@@ -183,13 +187,22 @@ class XssModule(BaseModule):
 
         with ThreadPoolExecutor(max_workers=3) as pool:
             futures = {}
-            for pname in param_names:
-                for entry in XSS_PAYLOADS:
-                    payload = entry["payload"]
-                    test_url = _make_test_url(target, pname, payload)
-                    futures[pool.submit(request_handler.get, test_url)] = (
-                        pname, payload, test_url
-                    )
+            for param_entry in param_names:
+                pname = param_entry["name"]
+                method = param_entry["method"]
+                for xss_entry in XSS_PAYLOADS:
+                    payload = xss_entry["payload"]
+                    if method == "POST":
+                        test_url = target
+                        futures[pool.submit(
+                            request_handler.post, target,
+                            data={pname: payload}
+                        )] = (pname, payload, test_url)
+                    else:
+                        test_url = _make_test_url(target, pname, payload)
+                        futures[pool.submit(
+                            request_handler.get, test_url
+                        )] = (pname, payload, test_url)
 
             bar = output.create_progress_bar("XSS", len(futures))
             for future in as_completed(futures):
