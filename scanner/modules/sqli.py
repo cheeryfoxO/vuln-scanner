@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from scanner.modules.base import BaseModule
 from scanner.core.html_utils import _extract_params, _make_test_url
-from scanner.core.encoding import generate_variants, SQLI_TECHNIQUES
+from scanner.core.encoding import generate_variants, SQLI_TECHNIQUES, TECHNIQUE_FUNCS
 
 
 # ── Error-Based Payloads ────────────────────────────────────────────
@@ -203,8 +203,8 @@ class SqliModule(BaseModule):
         output.log_progress(f"Found {len(param_names)} potential parameters: {param_list}")
 
         findings = []
-        time_based_targets = []
         param_has_error = set()
+        param_has_time = set()
 
         # Phase 1: Error-based (fast, 3 concurrent requests)
         output.log_progress(f"Phase 1: Error-based testing ({len(ERROR_PAYLOADS)} payloads)")
@@ -255,9 +255,10 @@ class SqliModule(BaseModule):
             bar.close()
 
         # Determine which params need Phase 2
-        for entry in param_names:
-            if entry["name"] not in param_has_error:
-                time_based_targets.append(entry)
+        time_based_targets = [
+            entry for entry in param_names
+            if entry["name"] not in param_has_error
+        ]
 
         # Phase 2: Time-based blind for params without error matches
         if time_based_targets:
@@ -331,8 +332,103 @@ class SqliModule(BaseModule):
                             }
                             findings.append(finding)
                             output.log_finding(self.name, finding)
+                            param_has_time.add(pname)
                     except Exception:
                         pass
+                    output.update_progress(bar)
+                bar.close()
+
+        # Phase 3: Boolean-based blind for params without error or time hits
+        bool_targets = [
+            entry for entry in param_names
+            if entry["name"] not in param_has_error
+            and entry["name"] not in param_has_time
+        ]
+
+        if bool_targets:
+            output.log_progress(
+                f"Phase 3: Boolean-based blind ({len(bool_targets)} params, "
+                f"{len(BOOL_PAYLOADS)} pairs)"
+            )
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                futures = {}
+                for entry in bool_targets:
+                    pname = entry["name"]
+                    method = entry["method"]
+                    for pair in BOOL_PAYLOADS:
+                        for encoded, tech in generate_variants(pair["true"], SQLI_TECHNIQUES):
+                            # FALSE — encode with same technique
+                            if tech == "plain":
+                                false_encoded = pair["false"]
+                            else:
+                                false_encoded = TECHNIQUE_FUNCS[tech](pair["false"])
+
+                            if method == "POST":
+                                true_url = target
+                                futures[pool.submit(
+                                    request_handler.post, target,
+                                    data={pname: encoded}
+                                )] = (pname, pair, True, true_url, tech)
+                                false_url = target
+                                futures[pool.submit(
+                                    request_handler.post, target,
+                                    data={pname: false_encoded}
+                                )] = (pname, pair, False, false_url, tech)
+                            else:
+                                true_url = _make_test_url(target, pname, encoded)
+                                futures[pool.submit(
+                                    request_handler.get, true_url
+                                )] = (pname, pair, True, true_url, tech)
+                                false_url = _make_test_url(target, pname, false_encoded)
+                                futures[pool.submit(
+                                    request_handler.get, false_url
+                                )] = (pname, pair, False, false_url, tech)
+
+                bar = output.create_progress_bar("Boolean-Blind", len(futures))
+                pairs_cache = {}
+                for future in as_completed(futures):
+                    pname, pair, is_true, url, tech = futures[future]
+                    key = (pname, pair["name"], tech)
+                    try:
+                        resp = future.result()
+                        if key not in pairs_cache:
+                            pairs_cache[key] = {
+                                "true_html": None, "false_html": None,
+                                "true_url": None, "false_url": None,
+                            }
+                        if is_true:
+                            pairs_cache[key]["true_html"] = resp.text
+                            pairs_cache[key]["true_url"] = url
+                        else:
+                            pairs_cache[key]["false_html"] = resp.text
+                            pairs_cache[key]["false_url"] = url
+
+                        cache = pairs_cache[key]
+                        if cache["true_html"] is not None and cache["false_html"] is not None:
+                            verdict, indicators, detail = _compare_responses(
+                                cache["true_html"], cache["false_html"]
+                            )
+                            if verdict:
+                                finding = {
+                                    "type": "boolean_based",
+                                    "parameter": pname,
+                                    "true_url": cache["true_url"],
+                                    "false_url": cache["false_url"],
+                                    "payload_pair": pair["name"],
+                                    "encoding": tech,
+                                    "indicators": indicators,
+                                    "evidence": (
+                                        f"TRUE/FALSE response differ: {detail} "
+                                        f"(encoding: {tech})"
+                                    ),
+                                }
+                                findings.append(finding)
+                                output.log_finding(self.name, finding)
+                                param_has_time.add(pname)
+                            del pairs_cache[key]
+                    except Exception:
+                        if key in pairs_cache:
+                            pairs_cache.pop(key, None)
                     output.update_progress(bar)
                 bar.close()
 
