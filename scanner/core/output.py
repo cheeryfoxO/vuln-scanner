@@ -24,6 +24,10 @@ class Output:
         self.use_color = use_color and HAS_COLOR
         self.json_path = json_path
         self.results = {}
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
     def _color(self, code):
         if not self.use_color:
