@@ -14,9 +14,10 @@ from scanner.modules.dom_xss import DomXssModule
 from scanner.modules.stored_xss import StoredXssModule
 from scanner.modules.cmdi import CmdiModule
 from scanner.modules.lfi import LfiModule
+from scanner.modules.redirect import RedirectModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule]
 
 
 def _build_parser():

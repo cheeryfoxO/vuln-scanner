@@ -99,6 +99,12 @@ class Output:
             param = finding.get("parameter", "?")
             print(f"[{module_name}] {finding['type']} ({os_name}): {param} "
                   f"— {file_name} — {finding.get('url', '')}")
+        elif module_name == "redirect":
+            code = finding.get("status_code", 0)
+            param = finding.get("parameter", "?")
+            location = finding.get("location", "?")
+            print(f"[{module_name}] {code} → {location} "
+                  f"— param: {param}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
