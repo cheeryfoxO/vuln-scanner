@@ -93,6 +93,12 @@ class Output:
             else:
                 print(f"[{module_name}] {finding['type']} ({os_name}): {param}{enc_str} "
                       f"-- {finding.get('url', '')}")
+        elif module_name == "lfi":
+            os_name = finding.get("os", "?")
+            file_name = finding.get("file", "?")
+            param = finding.get("parameter", "?")
+            print(f"[{module_name}] {finding['type']} ({os_name}): {param} "
+                  f"— {file_name} — {finding.get('url', '')}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
