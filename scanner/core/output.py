@@ -130,6 +130,12 @@ class Output:
             value = finding.get("value", "")
             val_str = f" = {value}" if value else ""
             print(f"[{module_name}] {status}: {header}{val_str}")
+        elif module_name == "cors":
+            sev = finding.get("severity", "?")
+            sev_color = Fore.RED if sev == "critical" else Fore.YELLOW
+            print(f"[{module_name}] {sev_color}{sev}{self._reset()} — "
+                  f"{finding.get('origin', '?')} → {finding.get('url', '')}"
+                  f"{' [creds]' if finding.get('acac') else ''}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
