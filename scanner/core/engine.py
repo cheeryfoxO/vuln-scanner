@@ -1,12 +1,15 @@
 """Scan engine -- module registry, execution orchestration, result aggregation."""
 from datetime import datetime
 
+from scanner.core.crawler import Crawler
+
 
 class Engine:
     """Orchestrates module execution and collects results."""
 
     def __init__(self):
         self.modules = {}
+        self.discovered_urls = []
 
     def register(self, module):
         """Register a module instance."""
@@ -48,6 +51,17 @@ class Engine:
 
         output.log_progress(f"Modules to run: {names_to_run}")
 
+        # Phase 0: Crawl if depth > 1
+        self.discovered_urls = []
+        if depth > 1:
+            crawler = Crawler()
+            normalized_target = target.rstrip("/")
+            if not normalized_target.startswith("http"):
+                normalized_target = f"http://{normalized_target}"
+            self.discovered_urls = crawler.crawl(
+                normalized_target, depth, scope, request_handler, output
+            )
+
         all_findings = {}
         modules_ran = []
 
@@ -62,9 +76,12 @@ class Engine:
             except Exception as e:
                 output.log_progress(f"Module {mod.name} failed: {e}")
 
-        return {
+        report = {
             "scan_time": datetime.now().isoformat(),
             "target": target,
             "modules": modules_ran,
             "findings": all_findings,
         }
+        if self.discovered_urls:
+            report["discovered_urls"] = len(self.discovered_urls)
+        return report
