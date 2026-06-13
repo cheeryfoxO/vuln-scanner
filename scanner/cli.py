@@ -8,9 +8,10 @@ from scanner.core.output import Output
 from scanner.modules.subdomain import SubdomainModule
 from scanner.modules.dirscan import DirscanModule
 from scanner.modules.params import ParamsModule
+from scanner.modules.sqli import SqliModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule]
 
 
 def _build_parser():
@@ -33,6 +34,8 @@ def _build_parser():
     scan.add_argument("--no-color", action="store_true", help="Disable colored output")
     scan.add_argument("--subdomain-wordlist", help="Custom subdomain wordlist file")
     scan.add_argument("--dirscan-wordlist", help="Custom directory wordlist file")
+    scan.add_argument("--sqli-threshold", type=int, default=5,
+                      help="SQLi time-based threshold in seconds (default: 5)")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -52,10 +55,12 @@ def main():
     engine = Engine()
     for cls in MODULE_CLASSES:
         kwargs = {}
-        if cls is SubdomainModule and args.subdomain_wordlist:
-            kwargs["wordlist_path"] = args.subdomain_wordlist
-        if cls is DirscanModule and args.dirscan_wordlist:
-            kwargs["wordlist_path"] = args.dirscan_wordlist
+        sub_wl = getattr(args, "subdomain_wordlist", None)
+        dir_wl = getattr(args, "dirscan_wordlist", None)
+        if cls is SubdomainModule and sub_wl:
+            kwargs["wordlist_path"] = sub_wl
+        if cls is DirscanModule and dir_wl:
+            kwargs["wordlist_path"] = dir_wl
         mod = cls(**kwargs)
         engine.register(mod)
 
