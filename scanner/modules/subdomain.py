@@ -54,15 +54,14 @@ class SubdomainModule(BaseModule):
         resolved = []
         with ThreadPoolExecutor(max_workers=50) as pool:
             futures = {pool.submit(self._resolve, f"{p}.{target}"): p for p in prefixes}
-            done = 0
+            bar = output.create_progress_bar("DNS Resolving", len(prefixes))
             for future in as_completed(futures):
-                done += 1
                 ips = future.result()
                 if ips:
                     prefix = futures[future]
                     resolved.append((f"{prefix}.{target}", ips[0]))
-                if done % 50 == 0:
-                    output.log_progress(f"DNS: {done}/{len(prefixes)} done, {len(resolved)} resolved")
+                output.update_progress(bar)
+            bar.close()
 
         output.log_progress(f"DNS complete: {len(resolved)} subdomains resolved, checking HTTP...")
 
@@ -72,10 +71,9 @@ class SubdomainModule(BaseModule):
             with ThreadPoolExecutor(max_workers=20) as pool:
                 futures = {pool.submit(self._check_http, host, request_handler): (host, ip)
                            for host, ip in resolved}
-                done = 0
+                bar = output.create_progress_bar("HTTP Checking", len(resolved))
                 for future in as_completed(futures):
                     host, ip = futures[future]
-                    done += 1
                     try:
                         status, title = future.result()
                         if status:
@@ -84,8 +82,8 @@ class SubdomainModule(BaseModule):
                             output.log_finding(self.name, finding)
                     except Exception:
                         pass
-                    if done % 20 == 0:
-                        output.log_progress(f"HTTP: {done}/{len(resolved)} checked, {len(findings)} live")
+                    output.update_progress(bar)
+                bar.close()
 
         output.log_progress(f"Subdomain scan done: {len(findings)} live subdomains found")
         return {"module": self.name, "findings": findings}

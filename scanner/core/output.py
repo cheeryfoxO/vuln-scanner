@@ -16,6 +16,13 @@ except ImportError:
     Style = _Dummy()
 
 
+class _DummyBar:
+    def update(self, n=1):
+        pass
+    def close(self):
+        pass
+
+
 class Output:
     """Handles all output: colored terminal + JSON report generation."""
 
@@ -62,6 +69,20 @@ class Output:
         """Print progress (verbose mode only)."""
         if self.verbose:
             print(f"[*] {message}", file=sys.stderr)
+
+    def create_progress_bar(self, desc, total):
+        """Create a progress bar. Returns tqdm or dummy if !verbose."""
+        if self.verbose:
+            try:
+                from tqdm import tqdm
+                return tqdm(total=total, desc=desc, unit="req", ncols=80)
+            except ImportError:
+                pass
+        return _DummyBar()
+
+    def update_progress(self, bar, n=1):
+        """Update progress bar. No-op for dummy bars."""
+        bar.update(n)
 
     def write_report(self, target, modules_used):
         """Build and optionally save JSON report."""

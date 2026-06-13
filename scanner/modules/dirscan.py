@@ -73,9 +73,8 @@ class DirscanModule(BaseModule):
                 url = f"{target}{clean_path}"
                 futures[pool.submit(self._probe, url, request_handler, baseline_status, baseline_length)] = url
 
-            done = 0
+            bar = output.create_progress_bar("Dirscan", len(paths))
             for future in as_completed(futures):
-                done += 1
                 try:
                     result = future.result()
                     if result:
@@ -83,8 +82,8 @@ class DirscanModule(BaseModule):
                         output.log_finding(self.name, result)
                 except Exception:
                     pass
-                if done % 50 == 0:
-                    output.log_progress(f"Dirscan: {done}/{len(paths)} probed, {len(findings)} found")
+                output.update_progress(bar)
+            bar.close()
 
         output.log_progress(f"Dirscan done: {len(findings)} accessible paths found")
         return {"module": self.name, "findings": findings}
