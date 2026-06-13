@@ -111,6 +111,11 @@ class Output:
             param = finding.get("parameter", "?")
             print(f"[{module_name}] {service} ({ssrf_target}): "
                   f"param={param} — {finding.get('url', '')}")
+        elif module_name == "csrf":
+            action = finding.get("form_action", "?")
+            num_inputs = len(finding.get("inputs", []))
+            print(f"[{module_name}] No token: {action} "
+                  f"({num_inputs} inputs)")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
