@@ -116,6 +116,12 @@ class Output:
             num_inputs = len(finding.get("inputs", []))
             print(f"[{module_name}] No token: {action} "
                   f"({num_inputs} inputs)")
+        elif module_name == "headers":
+            status = finding.get("status", "?")
+            header = finding.get("header", "?")
+            value = finding.get("value", "")
+            val_str = f" = {value}" if value else ""
+            print(f"[{module_name}] {status}: {header}{val_str}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
