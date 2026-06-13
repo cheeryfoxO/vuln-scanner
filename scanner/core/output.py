@@ -105,6 +105,12 @@ class Output:
             location = finding.get("location", "?")
             print(f"[{module_name}] {code} → {location} "
                   f"— param: {param}")
+        elif module_name == "ssrf":
+            service = finding.get("service", "?")
+            ssrf_target = finding.get("ssrf_target", "?")
+            param = finding.get("parameter", "?")
+            print(f"[{module_name}] {service} ({ssrf_target}): "
+                  f"param={param} — {finding.get('url', '')}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
