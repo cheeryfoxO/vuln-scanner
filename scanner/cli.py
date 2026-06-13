@@ -47,6 +47,14 @@ def _build_parser():
     scan.add_argument("--dirscan-wordlist", help="Custom directory wordlist file")
     scan.add_argument("--sqli-threshold", type=int, default=5,
                       help="SQLi time-based threshold in seconds (default: 5)")
+    scan.add_argument("--delay", type=int, default=0,
+                      help="Delay between requests in ms (rate limiting)")
+    scan.add_argument("--cookie", help="Cookie string (e.g., 'session=abc; token=xyz')")
+    scan.add_argument("--header", action="append", dest="headers",
+                      help="Extra header (repeatable, e.g., -H 'X-Key: val')")
+    scan.add_argument("--scope", help="Restrict to domain (e.g., '*.example.com')")
+    scan.add_argument("--depth", type=int, default=1,
+                      help="Crawl depth (default: 1, no recursion)")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -88,7 +96,19 @@ def main():
         module_names = [m.strip() for m in args.modules.split(",")]
 
     # Build dependencies
-    request_handler = RequestHandler(timeout=args.timeout)
+    extra_headers = {}
+    if getattr(args, "headers", None):
+        for h in args.headers:
+            if ":" in h:
+                k, v = h.split(":", 1)
+                extra_headers[k.strip()] = v.strip()
+
+    request_handler = RequestHandler(
+        timeout=args.timeout,
+        delay=getattr(args, "delay", 0),
+        cookies=getattr(args, "cookie", None),
+        extra_headers=extra_headers or None,
+    )
     output = Output(
         verbose=args.verbose,
         use_color=not args.no_color,
@@ -97,7 +117,12 @@ def main():
 
     # Run
     output.log_progress(f"Starting scan against {args.target}")
-    report = engine.run(args.target, module_names, request_handler, output, threads=args.threads)
+    report = engine.run(
+        args.target, module_names, request_handler, output,
+        threads=args.threads,
+        scope=getattr(args, "scope", None),
+        depth=getattr(args, "depth", 1),
+    )
 
     # Write JSON report
     if args.output:

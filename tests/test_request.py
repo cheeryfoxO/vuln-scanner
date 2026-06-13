@@ -37,3 +37,35 @@ class TestPost:
         params = list(sig.parameters.keys())
         assert "url" in params
         assert "data" in params
+
+
+class TestDelay:
+    def test_default_delay_is_zero(self):
+        rh = RequestHandler()
+        assert rh.delay == 0
+
+    def test_custom_delay_converts_ms_to_seconds(self):
+        rh = RequestHandler(delay=200)
+        assert rh.delay == 0.2
+
+
+class TestCookies:
+    def test_cookie_string_parsed(self):
+        rh = RequestHandler(cookies="session=abc; token=xyz")
+        cookies = rh.session.cookies.get_dict()
+        assert cookies.get("session") == "abc"
+        assert cookies.get("token") == "xyz"
+
+    def test_no_cookies_by_default(self):
+        rh = RequestHandler()
+        assert rh.session.cookies.get_dict() == {}
+
+
+class TestExtraHeaders:
+    def test_extra_headers_stored(self):
+        rh = RequestHandler(extra_headers={"X-Custom": "val"})
+        assert rh.extra_headers == {"X-Custom": "val"}
+
+    def test_no_extra_headers_by_default(self):
+        rh = RequestHandler()
+        assert rh.extra_headers == {}

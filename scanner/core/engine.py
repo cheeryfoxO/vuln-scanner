@@ -25,7 +25,8 @@ class Engine:
             return target.replace("https://", "").replace("http://", "").rstrip("/")
         return target
 
-    def run(self, target, module_names, request_handler, output, threads=10):
+    def run(self, target, module_names, request_handler, output, threads=10,
+            scope=None, depth=1):
         """Execute specified modules against the target.
 
         Args:
@@ -34,6 +35,8 @@ class Engine:
             request_handler: RequestHandler instance
             output: Output instance
             threads: Concurrency hint (reserved for future use)
+            scope: Domain scope pattern (e.g., '*.example.com')
+            depth: Crawl depth (default 1, no recursion)
 
         Returns:
             Report dict with target, scan_time, modules, findings
