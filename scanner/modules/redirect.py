@@ -48,7 +48,7 @@ class RedirectModule(BaseModule):
     description = "Detect open redirect via Location header analysis"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run open redirect detection."""
         target = target.rstrip("/")
         parsed_target = urllib.parse.urlparse(target)
@@ -90,7 +90,7 @@ class RedirectModule(BaseModule):
             f"{len(param_names)} parameters"
         )
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
             futures = {}
             for entry in param_names:
                 pname = entry["name"]

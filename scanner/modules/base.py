@@ -23,5 +23,8 @@ class BaseModule(ABC):
 
         Returns:
             {"module": self.name, "findings": [<dict>, ...]}
+
+        Modules that support internal parallelism may also accept a
+        ``threads`` keyword argument.
         """
         ...

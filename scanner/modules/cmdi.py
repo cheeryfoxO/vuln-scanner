@@ -101,7 +101,7 @@ class CmdiModule(BaseModule):
     description = "Detect command injection via error output + time-based blind"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run error-based and time-based command injection detection."""
         target = target.rstrip("/")
         output.log_progress(f"Fetching {target} for parameter extraction...")
@@ -140,7 +140,7 @@ class CmdiModule(BaseModule):
         output.log_progress(
             f"Phase 1: Error-based testing ({len(CMD_ERROR_PAYLOADS)} payloads)"
         )
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
             futures = {}
             for entry in param_names:
                 pname = entry["name"]
@@ -201,7 +201,7 @@ class CmdiModule(BaseModule):
                 f"Phase 2: Time-based blind ({len(time_based_targets)} params, "
                 f"{len(CMD_SLEEP_PAYLOADS)} payloads)"
             )
-            with ThreadPoolExecutor(max_workers=3) as pool:
+            with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
                 # Compute baseline for each parameter
                 param_baselines = {}
                 for entry in time_based_targets:

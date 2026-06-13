@@ -57,6 +57,9 @@ def _build_parser():
     scan.add_argument("--scope", help="Restrict to domain (e.g., '*.example.com')")
     scan.add_argument("--depth", type=int, default=1,
                       help="Crawl depth (default: 1, no recursion)")
+    scan.add_argument("--proxy", help="Proxy URL (e.g., 'http://127.0.0.1:8080' for Burp)")
+    scan.add_argument("--resume", metavar="FILE",
+                      help="Resume interrupted scan from JSON output file")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -105,11 +108,14 @@ def main():
                 k, v = h.split(":", 1)
                 extra_headers[k.strip()] = v.strip()
 
+    proxy = getattr(args, "proxy", None)
+
     request_handler = RequestHandler(
         timeout=args.timeout,
         delay=getattr(args, "delay", 0),
         cookies=getattr(args, "cookie", None),
         extra_headers=extra_headers or None,
+        proxy=proxy,
     )
     output = Output(
         verbose=args.verbose,
@@ -118,12 +124,19 @@ def main():
     )
 
     # Run
-    output.log_progress(f"Starting scan against {args.target}")
+    if proxy:
+        output.log_progress(f"Using proxy: {proxy} (SSL verify disabled)")
+    resume_from = getattr(args, "resume", None)
+    if resume_from:
+        output.log_progress(f"Resuming from checkpoint: {resume_from}")
+    else:
+        output.log_progress(f"Starting scan against {args.target}")
     report = engine.run(
         args.target, module_names, request_handler, output,
         threads=args.threads,
         scope=getattr(args, "scope", None),
         depth=getattr(args, "depth", 1),
+        resume=resume_from,
     )
 
     # Write JSON report

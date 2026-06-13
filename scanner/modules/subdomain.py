@@ -45,14 +45,15 @@ class SubdomainModule(BaseModule):
                 continue
         return 0, ""
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Enumerate subdomains for the given domain."""
         prefixes = self._load_wordlist()
         output.log_progress(f"Loaded {len(prefixes)} subdomain prefixes, resolving DNS...")
 
-        # Phase 1: DNS resolution (50 concurrent workers)
+        # Phase 1: DNS resolution (scale workers from threads)
+        dns_workers = max(10, min(threads * 5, 100))
         resolved = []
-        with ThreadPoolExecutor(max_workers=50) as pool:
+        with ThreadPoolExecutor(max_workers=dns_workers) as pool:
             futures = {pool.submit(self._resolve, f"{p}.{target}"): p for p in prefixes}
             bar = output.create_progress_bar("DNS Resolving", len(prefixes))
             for future in as_completed(futures):
@@ -65,10 +66,11 @@ class SubdomainModule(BaseModule):
 
         output.log_progress(f"DNS complete: {len(resolved)} subdomains resolved, checking HTTP...")
 
-        # Phase 2: HTTP liveness (20 concurrent workers)
+        # Phase 2: HTTP liveness (scale workers from threads)
+        http_workers = max(5, min(threads * 2, 50))
         findings = []
         if resolved:
-            with ThreadPoolExecutor(max_workers=20) as pool:
+            with ThreadPoolExecutor(max_workers=http_workers) as pool:
                 futures = {pool.submit(self._check_http, host, request_handler): (host, ip)
                            for host, ip in resolved}
                 bar = output.create_progress_bar("HTTP Checking", len(resolved))

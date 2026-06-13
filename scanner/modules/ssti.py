@@ -88,7 +88,7 @@ class SstiModule(BaseModule):
     description = "Detect server-side template injection via expression eval + time blind"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run SSTI detection."""
         target = target.rstrip("/")
         output.log_progress(f"Fetching {target} for parameter extraction...")
@@ -126,7 +126,7 @@ class SstiModule(BaseModule):
         output.log_progress(
             f"Phase 1: Expression evaluation ({len(_SSTI_PAYLOADS)} payloads)"
         )
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
             futures = {}
             for entry in param_names:
                 pname = entry["name"]
@@ -195,7 +195,7 @@ class SstiModule(BaseModule):
                 f"Phase 2: Time-based blind ({len(time_targets)} params, "
                 f"{len(_SSTI_SLEEP_PAYLOADS)} payloads)"
             )
-            with ThreadPoolExecutor(max_workers=3) as pool:
+            with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
                 param_baselines = {}
                 for entry in time_targets:
                     pname = entry["name"]

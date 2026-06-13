@@ -86,7 +86,7 @@ class DomXssModule(BaseModule):
     description = "Detect DOM XSS via JavaScript sink/source analysis"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run DOM XSS sink/source analysis against the target page."""
         target = target.rstrip("/")
         output.log_progress(f"Fetching {target} for DOM XSS analysis...")
@@ -108,7 +108,7 @@ class DomXssModule(BaseModule):
 
         # Fetch external JS files
         if external_urls:
-            with ThreadPoolExecutor(max_workers=5) as pool:
+            with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
                 futures = {}
                 for url in external_urls:
                     futures[pool.submit(request_handler.get, url)] = url

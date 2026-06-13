@@ -147,7 +147,7 @@ class XssModule(BaseModule):
     description = "Detect reflected XSS via DOM context analysis"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run XSS detection against target URL parameters."""
         target = target.rstrip("/")
         output.log_progress(f"Fetching {target} for XSS parameter extraction...")
@@ -187,7 +187,7 @@ class XssModule(BaseModule):
             f"x ~{variants_per} variants = ~{total_tests} requests"
         )
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
             futures = {}
             for param_entry in param_names:
                 pname = param_entry["name"]

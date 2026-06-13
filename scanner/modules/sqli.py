@@ -172,7 +172,7 @@ class SqliModule(BaseModule):
     description = "Detect SQL injection via error + time-based blind"
     requires_url = True
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Run error-based and time-based SQLi detection."""
         target = target.rstrip("/")
         output.log_progress(f"Fetching {target} for parameter extraction...")
@@ -208,7 +208,7 @@ class SqliModule(BaseModule):
 
         # Phase 1: Error-based (fast, 3 concurrent requests)
         output.log_progress(f"Phase 1: Error-based testing ({len(ERROR_PAYLOADS)} payloads)")
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
             futures = {}
             for entry in param_names:
                 pname = entry["name"]
@@ -266,7 +266,7 @@ class SqliModule(BaseModule):
                 f"Phase 2: Time-based blind ({len(time_based_targets)} params, "
                 f"{len(SLEEP_PAYLOADS)} DB types)"
             )
-            with ThreadPoolExecutor(max_workers=3) as pool:
+            with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
                 # Compute baseline for each parameter
                 param_baselines = {}
                 for entry in time_based_targets:
@@ -350,7 +350,7 @@ class SqliModule(BaseModule):
                 f"Phase 3: Boolean-based blind ({len(bool_targets)} params, "
                 f"{len(BOOL_PAYLOADS)} pairs)"
             )
-            with ThreadPoolExecutor(max_workers=3) as pool:
+            with ThreadPoolExecutor(max_workers=max(2, min(threads, 10))) as pool:
                 futures = {}
                 for entry in bool_targets:
                     pname = entry["name"]

@@ -92,7 +92,7 @@ class DirscanModule(BaseModule):
         except Exception:
             return None
 
-    def run(self, target, request_handler, output):
+    def run(self, target, request_handler, output, threads=10):
         """Scan directories and files on the target URL."""
         target = target.rstrip("/")
         paths = self._load_wordlist()
@@ -102,7 +102,8 @@ class DirscanModule(BaseModule):
         output.log_progress(f"Baseline: status={baseline_status}, body_len={baseline_length}")
 
         findings = []
-        with ThreadPoolExecutor(max_workers=20) as pool:
+        workers = max(5, min(threads * 2, 50))  # scale threads→workers (5..50)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = {}
             for path in paths:
                 clean_path = path if path.startswith("/") else f"/{path}"
