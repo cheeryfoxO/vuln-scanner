@@ -31,6 +31,8 @@ def _build_parser():
     scan.add_argument("-v", "--verbose", action="store_true", help="Verbose progress output")
     scan.add_argument("--timeout", type=int, default=10, help="Request timeout in seconds")
     scan.add_argument("--no-color", action="store_true", help="Disable colored output")
+    scan.add_argument("--subdomain-wordlist", help="Custom subdomain wordlist file")
+    scan.add_argument("--dirscan-wordlist", help="Custom directory wordlist file")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -49,7 +51,12 @@ def main():
     # Build engine and register all modules
     engine = Engine()
     for cls in MODULE_CLASSES:
-        mod = cls()
+        kwargs = {}
+        if cls is SubdomainModule and args.subdomain_wordlist:
+            kwargs["wordlist_path"] = args.subdomain_wordlist
+        if cls is DirscanModule and args.dirscan_wordlist:
+            kwargs["wordlist_path"] = args.dirscan_wordlist
+        mod = cls(**kwargs)
         engine.register(mod)
 
     if args.command == "list":

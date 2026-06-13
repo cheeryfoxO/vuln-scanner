@@ -14,8 +14,11 @@ class SubdomainModule(BaseModule):
     description = "Enumerate subdomains via DNS + HTTP liveness check"
     requires_url = False
 
+    def __init__(self, wordlist_path=None):
+        self.wordlist_path = wordlist_path or _WORDLIST
+
     def _load_wordlist(self):
-        path = os.path.normpath(_WORDLIST)
+        path = os.path.normpath(self.wordlist_path)
         with open(path, encoding="utf-8") as f:
             return [line.strip() for line in f if line.strip()]
 
