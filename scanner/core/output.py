@@ -79,6 +79,9 @@ class Output:
         elif module_name == "dom_xss":
             print(f"[{module_name}] {finding['sink']} ← {finding['source']}"
                   f" — {finding['file']}:{finding['line']}")
+        elif module_name == "stored_xss":
+            print(f"[{module_name}] {finding['payload_uid']}: "
+                  f"{finding['injected_field']} → {finding['found_on']}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""

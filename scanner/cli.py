@@ -11,9 +11,10 @@ from scanner.modules.params import ParamsModule
 from scanner.modules.sqli import SqliModule
 from scanner.modules.xss import XssModule
 from scanner.modules.dom_xss import DomXssModule
+from scanner.modules.stored_xss import StoredXssModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule]
 
 
 def _build_parser():
