@@ -65,6 +65,19 @@ SLEEP_PAYLOADS = [
 
 DEFAULT_THRESHOLD = 5  # seconds
 
+# ── Boolean-Based Payloads ──────────────────────────────────────────
+BOOL_PAYLOADS = [
+    {"name": "numeric", "true": " AND 1=1", "false": " AND 1=2"},
+    {"name": "string", "true": " AND 'a'='a", "false": " AND 'a'='b"},
+    {"name": "subquery", "true": " AND (SELECT 1)=1", "false": " AND (SELECT 1)=2"},
+]
+
+NO_RESULT_KEYWORDS = [
+    "no results", "not found", "no records", "0 results",
+    "nothing found", "查询结果为空", "没有找到", "暂无数据",
+    "找不到", "未找到", "无结果",
+]
+
 
 # ── Pure Functions (testable) ────────────────────────────────────────
 
@@ -90,6 +103,66 @@ def _build_baseline_time(url, send_request):
         times.append(elapsed)
     return sum(times) / len(times) if times else 0.0
 
+
+def _strip_dynamic(text):
+    """Remove dynamic content for reliable comparison.
+
+    Strips: Unix timestamps (10-13 digits), hex tokens (32+ chars),
+    script tag content, normalizes whitespace.
+    """
+    text = re.sub(r'(?<!\d)\d{10,13}(?!\d)', '', text)
+    text = re.sub(r'(?<![0-9a-f])[0-9a-f]{32,}(?![0-9a-f])', '', text)
+    text = re.sub(r'(?<![0-9a-f])[0-9a-f]{64,}(?![0-9a-f])', '', text)
+    text = re.sub(r'<script[^>]*>.*?</script>', '', text, flags=re.S | re.I)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+
+def _compare_responses(true_html, false_html):
+    """Compare TRUE vs FALSE responses using 3 indicators.
+
+    Returns (verdict: bool, indicators: list, detail: str).
+    Verdict is True when >= 2 of 3 indicators trigger.
+    """
+    votes = 0
+    indicators = []
+    ratio = 0.0
+
+    # Indicator 1: body length ratio > 5%
+    len_true = len(true_html)
+    len_false = len(false_html)
+    max_len = max(len_true, len_false)
+    if max_len > 0:
+        ratio = abs(len_true - len_false) / max_len
+        if ratio > 0.05:
+            votes += 1
+            indicators.append("body_length")
+
+    # Indicator 2: stripped content hash
+    clean_true = _strip_dynamic(true_html)
+    clean_false = _strip_dynamic(false_html)
+    if clean_true != clean_false:
+        votes += 1
+        indicators.append("body_hash")
+
+    # Indicator 3: no-result keywords in FALSE but not TRUE
+    false_lower = false_html.lower()
+    true_lower = true_html.lower()
+    for kw in NO_RESULT_KEYWORDS:
+        if kw in false_lower and kw not in true_lower:
+            votes += 1
+            indicators.append("content_keyword")
+            break
+
+    detail_parts = []
+    if "body_length" in indicators:
+        detail_parts.append(f"length diff {ratio*100:.1f}%")
+    if "body_hash" in indicators:
+        detail_parts.append("hash mismatch")
+    if "content_keyword" in indicators:
+        detail_parts.append("no-result keyword")
+
+    return votes >= 2, indicators, ", ".join(detail_parts)
 
 
 # ── SqliModule ───────────────────────────────────────────────────────
