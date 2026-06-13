@@ -10,13 +10,20 @@ class _FormParser(HTMLParser):
         super().__init__()
         self.input_names = set()
         self.param_hints = set()
+        self.post_params = set()
+        self._current_form_method = "GET"
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == "input":
+        if tag == "form":
+            self._current_form_method = attrs.get("method", "GET").upper()
+        elif tag == "input":
             name = attrs.get("name", "")
             if name:
-                self.input_names.add(name)
+                if self._current_form_method == "POST":
+                    self.post_params.add(name)
+                else:
+                    self.input_names.add(name)
         elif tag == "a":
             href = attrs.get("href", "")
             if "?" in href:
@@ -26,13 +33,17 @@ class _FormParser(HTMLParser):
 
 
 def _extract_params(target_url, html):
-    """Extract parameter names from URL query string and HTML forms."""
-    params = set()
+    """Extract parameter names from URL query string and HTML forms.
 
-    # From URL itself
+    Returns list of dicts: [{"name": str, "method": "GET"|"POST"}, ...]
+    POST takes precedence when a param appears in both GET and POST contexts.
+    """
+    result = {}
+
+    # From URL itself → GET
     parsed = urllib.parse.urlparse(target_url)
     for k in urllib.parse.parse_qs(parsed.query):
-        params.add(k)
+        result.setdefault(k, "GET")
 
     # From HTML forms/links
     parser = _FormParser()
@@ -40,10 +51,15 @@ def _extract_params(target_url, html):
         parser.feed(html)
     except Exception:
         pass
-    params.update(parser.input_names)
-    params.update(parser.param_hints)
 
-    return list(params)
+    for name in parser.input_names:
+        result.setdefault(name, "GET")
+    for name in parser.param_hints:
+        result.setdefault(name, "GET")
+    for name in parser.post_params:
+        result[name] = "POST"  # POST takes precedence
+
+    return [{"name": k, "method": v} for k, v in result.items()]
 
 
 def _make_test_url(base_url, param_name, payload):
