@@ -76,6 +76,9 @@ class Output:
             enc = finding.get("encoding", "")
             enc_str = f" [{enc}]" if enc and enc != "plain" else ""
             print(f"[{module_name}] {finding['type']} ({db}): {param}{enc_str} -- {finding.get('url', '')}")
+        elif module_name == "dom_xss":
+            print(f"[{module_name}] {finding['sink']} ← {finding['source']}"
+                  f" — {finding['file']}:{finding['line']}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""
