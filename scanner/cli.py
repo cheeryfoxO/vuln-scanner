@@ -64,6 +64,18 @@ def _build_parser():
     # list command
     subparsers.add_parser("list", help="List available modules")
 
+    # fetch-wordlists command
+    fetch_wl = subparsers.add_parser("fetch-wordlists", help="Download popular open-source wordlists")
+    fetch_wl.add_argument("--all", action="store_const", dest="fetch_kind", const="all",
+                          help="Download all wordlists (dirs + subdomains) [default]")
+    fetch_wl.add_argument("--dirs", action="store_const", dest="fetch_kind", const="dirs",
+                          help="Download directory wordlists only")
+    fetch_wl.add_argument("--subdomains", action="store_const", dest="fetch_kind", const="subdomains",
+                          help="Download subdomain wordlists only")
+    fetch_wl.add_argument("--status", action="store_const", dest="fetch_kind", const="status",
+                          help="Show downloaded wordlists status")
+    fetch_wl.set_defaults(fetch_kind="all")
+
     return parser
 
 
@@ -92,6 +104,11 @@ def main():
         print("Available modules:")
         for name, desc in engine.list_modules().items():
             print(f"  {name:12} {desc}")
+        return
+
+    if args.command == "fetch-wordlists":
+        from scanner.core.fetcher import run_fetch
+        run_fetch(getattr(args, "fetch_kind", "all"))
         return
 
     # Parse module names
