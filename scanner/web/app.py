@@ -641,7 +641,7 @@ def create_app():
     return app
 
 
-def run_web(host="127.0.0.1", port=8080, open_browser=True):
+def run_web(host="127.0.0.1", port=8085, open_browser=True):
     """Launch the web server."""
     try:
         from flask import Flask

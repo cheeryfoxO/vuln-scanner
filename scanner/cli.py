@@ -98,7 +98,7 @@ def _build_parser():
     # web command
     web = subparsers.add_parser("web", help="Launch web-based scan interface")
     web.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
-    web.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
+    web.add_argument("--port", type=int, default=8085, help="Port (default: 8085)")
     web.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
 
     return parser
