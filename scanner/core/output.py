@@ -147,6 +147,21 @@ class Output:
             else:
                 print(f"[{module_name}] {finding['type']} ({engine}): {param}{enc_str} "
                       f"-- {finding.get('url', '')}")
+        elif module_name == "fingerprint":
+            techs = finding.get("all_techs", [])
+            cdn = finding.get("cdn", "")
+            wafs = finding.get("wafs", [])
+            status = finding.get("status_code", "?")
+            tech_str = ", ".join(techs) if techs else "generic"
+            cdn_str = f" | CDN: {cdn}" if cdn else ""
+            waf_str = f" | WAF: {', '.join(w['waf'] for w in wafs)}" if wafs else ""
+            print(f"[{module_name}] {Fore.CYAN}{status}{self._reset()} — "
+                  f"{tech_str}{cdn_str}{waf_str}")
+
+        # PoC display (verbose or if available)
+        poc = finding.get("poc", "")
+        if poc and self.verbose:
+            print(f"    ↳ {Fore.LIGHTBLACK_EX}PoC: {poc}{self._reset()}")
 
     def log_progress(self, message):
         """Print progress (verbose mode only)."""

@@ -48,7 +48,10 @@ def test_engine_runs_single_module():
     req = FakeRequestHandler()
     results = engine.run("example.com", ["fake"], req, output, threads=10)
     assert results["target"] == "example.com"
-    assert results["findings"]["fake"] == [{"key": "value"}]
+    assert len(results["findings"]["fake"]) == 1
+    assert results["findings"]["fake"][0]["key"] == "value"
+    # PoC auto-injected
+    assert "poc" in results["findings"]["fake"][0]
 
 
 def test_engine_skips_unknown_module():

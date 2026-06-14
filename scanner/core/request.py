@@ -91,6 +91,7 @@ class RequestHandler:
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         # Always-attached cookies
+        self.cookies_str = cookies if isinstance(cookies, str) else None
         if cookies:
             if isinstance(cookies, str):
                 for item in cookies.split(";"):
@@ -101,6 +102,7 @@ class RequestHandler:
             elif isinstance(cookies, dict):
                 for k, v in cookies.items():
                     self.session.cookies.set(k, v)
+                self.cookies_str = "; ".join(f"{k}={v}" for k, v in cookies.items())
 
         # Always-merged extra headers
         self.extra_headers = extra_headers or {}

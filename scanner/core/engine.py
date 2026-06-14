@@ -6,9 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from scanner.core.crawler import Crawler
+from scanner.core.poc import inject_poc_into_finding
 
 # Modules that don't send attack payloads — safe to run in parallel
-NON_INVASIVE = {"subdomain", "dirscan", "params", "headers", "cors", "csrf"}
+NON_INVASIVE = {"subdomain", "dirscan", "params", "headers", "cors", "csrf", "fingerprint"}
 
 
 class Engine:
@@ -82,6 +83,10 @@ class Engine:
         if not names:
             return
 
+        # Cookie/header context for PoC generation
+        cookies = getattr(request_handler, 'cookies_str', None) or getattr(request_handler, 'extra_headers', {})
+        extra_hdrs = getattr(request_handler, 'extra_headers', {}) or {}
+
         # Build future → name map
         futures_map = {}
         with ThreadPoolExecutor(max_workers=min(threads, len(names))) as pool:
@@ -96,7 +101,16 @@ class Engine:
                 name = futures_map[future]
                 try:
                     result = future.result()
-                    all_findings[result["module"]] = result["findings"]
+                    findings = result["findings"]
+                    # Inject reproducible PoC into each finding
+                    for f in findings:
+                        inject_poc_into_finding(
+                            f, name,
+                            cookies=cookies if isinstance(cookies, str) else None,
+                            extra_headers=extra_hdrs,
+                            target=target,
+                        )
+                    all_findings[result["module"]] = findings
                     modules_ran.append(name)
                     output.log_progress(f"✓ {name} complete")
                 except Exception as e:

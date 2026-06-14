@@ -96,12 +96,22 @@ def generate_html(target, report, output_path):
             evidence = _escape_html(finding.get("evidence", str(finding)))
             # Build compact key-value display
             detail_items = []
-            skip_keys = {"evidence"}
+            skip_keys = {"evidence", "poc"}
             for k, v in finding.items():
                 if k not in skip_keys:
                     val = str(v)[:120]
                     detail_items.append(f'<span class="kv"><b>{k}:</b> {_escape_html(val)}</span>')
             details = " &nbsp;|&nbsp; ".join(detail_items)
+
+            # PoC curl command
+            poc = finding.get("poc", "")
+            poc_html = ""
+            if poc:
+                poc_html = (
+                    f'<div class="poc">'
+                    f'<code>$ {_escape_html(poc)}</code>'
+                    f'</div>'
+                )
 
             findings_html += (
                 f'<div class="finding">'
@@ -111,6 +121,7 @@ def generate_html(target, report, output_path):
                 f'</div>'
                 f'<div class="finding-details">{details}</div>'
                 f'<div class="finding-evidence">{evidence}</div>'
+                f'{poc_html}'
                 f'</div>'
             )
         findings_html += '</div>'
@@ -149,6 +160,11 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans
 .finding-evidence {{ color: #e6edf3; font-size: 12px; background: #0d1117;
                     padding: 8px; border-radius: 4px; border-left: 3px solid #30363d;
                     font-family: monospace; word-break: break-all; }}
+.poc {{ margin-top: 8px; }}
+.poc code {{ display: block; color: #7ee787; background: #0d1117; padding: 10px;
+            border-radius: 4px; border-left: 3px solid #238636; font-size: 11px;
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            white-space: pre-wrap; word-break: break-all; overflow-x: auto; }}
 .footer {{ text-align: center; color: #484f58; font-size: 11px; margin-top: 32px; }}
 </style>
 </head>
