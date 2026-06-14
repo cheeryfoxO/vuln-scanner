@@ -7,6 +7,7 @@ from scanner.core.engine import Engine
 from scanner.core.request import RequestHandler
 from scanner.core.output import Output
 from scanner.core.report import generate_html
+from scanner.core.presets import apply_preset, save_user_preset, list_presets
 from scanner.modules.subdomain import SubdomainModule
 from scanner.modules.dirscan import DirscanModule
 from scanner.modules.params import ParamsModule
@@ -23,9 +24,11 @@ from scanner.modules.headers import HeadersModule
 from scanner.modules.cors import CorsModule
 from scanner.modules.ssti import SstiModule
 from scanner.modules.fingerprint import FingerprintModule
+from scanner.modules.jwt import JwtModule
+from scanner.modules.idor import IdorModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule, SstiModule, FingerprintModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule, SstiModule, FingerprintModule, JwtModule, IdorModule]
 
 
 def _build_parser():
@@ -62,6 +65,10 @@ def _build_parser():
     scan.add_argument("--proxy", help="Proxy URL (e.g., 'http://127.0.0.1:8080' for Burp)")
     scan.add_argument("--resume", metavar="FILE",
                       help="Resume interrupted scan from JSON output file")
+    scan.add_argument("--preset", help="Load named scan preset (quick, recon, api, injection, owasp, full)")
+    scan.add_argument("--save-preset", metavar="NAME",
+                      help="Save current config as a named preset")
+    scan.add_argument("--list-presets", action="store_true", help="List available presets")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -131,6 +138,10 @@ def main():
             print(f"  {name:12} {desc}")
         return
 
+    if getattr(args, "list_presets", False):
+        list_presets()
+        return
+
     if args.command == "fetch-wordlists":
         from scanner.core.fetcher import run_fetch
         run_fetch(getattr(args, "fetch_kind", "all"))
@@ -176,6 +187,9 @@ def main():
         return
 
     # Parse module names
+    if getattr(args, "preset", None):
+        apply_preset(args, args.preset)
+
     if args.modules == "all":
         module_names = ["all"]
     else:
@@ -234,6 +248,18 @@ def main():
     # Summary
     total = sum(len(v) for v in report["findings"].values())
     print(f"\nScan complete. {total} findings across {len(report['modules'])} modules.")
+
+    # Save preset if requested
+    save_name = getattr(args, "save_preset", None)
+    if save_name:
+        save_user_preset(
+            save_name,
+            modules=args.modules,
+            threads=args.threads,
+            delay=getattr(args, "delay", 100),
+            depth=getattr(args, "depth", 1),
+        )
+        print(f"Preset saved: {save_name}")
 
 
 if __name__ == "__main__":

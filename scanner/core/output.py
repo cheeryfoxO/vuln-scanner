@@ -158,6 +158,21 @@ class Output:
             print(f"[{module_name}] {Fore.CYAN}{status}{self._reset()} — "
                   f"{tech_str}{cdn_str}{waf_str}")
 
+        elif module_name == "jwt":
+            tok_type = finding.get("type", "?")
+            sev = finding.get("severity", "info")
+            sev_color = Fore.RED if sev == "critical" else Fore.YELLOW if sev == "high" else ""
+            desc = finding.get("desc", "")[:100]
+            print(f"[{module_name}] {sev_color}{tok_type}{self._reset()} "
+                  f"— {desc}")
+        elif module_name == "idor":
+            typ = finding.get("type", "?")
+            sev = finding.get("severity", "info")
+            sev_color = Fore.RED if sev == "critical" else Fore.YELLOW if sev == "high" else ""
+            desc = finding.get("desc", "")[:100]
+            print(f"[{module_name}] {sev_color}{typ}{self._reset()} "
+                  f"— {desc}")
+
         # PoC display (verbose or if available)
         poc = finding.get("poc", "")
         if poc and self.verbose:
