@@ -1,5 +1,6 @@
 """CLI entry point -- argument parsing and wiring."""
 import argparse
+import json
 import sys
 
 from scanner.core.engine import Engine
@@ -77,6 +78,29 @@ def _build_parser():
                           help="Show downloaded wordlists status")
     fetch_wl.set_defaults(fetch_kind="all")
 
+    # passive command
+    passive = subparsers.add_parser("passive", help="Scan imported HAR/Burp traffic files")
+    passive.add_argument("file", help="HAR or Burp XML file to parse")
+    passive.add_argument("-m", "--modules", default="all",
+                         help="Comma-separated module names or 'all'")
+    passive.add_argument("-t", "--threads", type=int, default=10,
+                         help="Concurrency hint (default: 10)")
+    passive.add_argument("-o", "--output", help="Save JSON report to file")
+    passive.add_argument("-r", "--report", help="Save HTML report to file")
+    passive.add_argument("-v", "--verbose", action="store_true", help="Verbose progress output")
+    passive.add_argument("--no-color", action="store_true", help="Disable colored output")
+    passive.add_argument("--timeout", type=int, default=10, help="Request timeout in seconds")
+    passive.add_argument("--delay", type=int, default=0,
+                         help="Delay between requests in ms (rate limiting)")
+    passive.add_argument("--cookie", help="Additional cookie string")
+    passive.add_argument("--proxy", help="Proxy URL for replay")
+
+    # web command
+    web = subparsers.add_parser("web", help="Launch web-based scan interface")
+    web.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
+    web.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
+    web.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+
     return parser
 
 
@@ -110,6 +134,45 @@ def main():
     if args.command == "fetch-wordlists":
         from scanner.core.fetcher import run_fetch
         run_fetch(getattr(args, "fetch_kind", "all"))
+        return
+
+    if args.command == "passive":
+        from scanner.core.passive import run_passive
+        from scanner.core.report import generate_html
+
+        module_names = [m.strip() for m in args.modules.split(",")] if args.modules != "all" else ["all"]
+
+        rh = RequestHandler(
+            timeout=args.timeout,
+            delay=getattr(args, "delay", 0),
+            cookies=getattr(args, "cookie", None),
+            proxy=getattr(args, "proxy", None),
+        )
+        out = Output(verbose=args.verbose, use_color=not args.no_color, json_path=args.output)
+
+        out.log_progress(f"Passive scan: {args.file}")
+        report = run_passive(args.file, module_names, rh, out, threads=args.threads)
+
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            print(f"JSON report saved to {args.output}")
+
+        if getattr(args, "report", None):
+            generate_html(f"passive:{args.file}", report, args.report)
+            print(f"HTML report saved to {args.report}")
+
+        total = sum(len(v) for v in report.get("findings", {}).values())
+        print(f"Passive scan complete. {total} findings from {report.get('scanned_targets', 0)} targets.")
+        return
+
+    if args.command == "web":
+        from scanner.web.app import run_web
+        run_web(
+            host=getattr(args, "host", "127.0.0.1"),
+            port=getattr(args, "port", 8080),
+            open_browser=not getattr(args, "no_browser", False),
+        )
         return
 
     # Parse module names
