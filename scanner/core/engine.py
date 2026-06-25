@@ -187,11 +187,18 @@ class Engine:
             skipped, all_findings, modules_ran, checkpoint_path
         )
 
+        # Deduplicate findings before returning report
+        from scanner.core.dedup import deduplicate_findings
+        report_findings, dedup_stats = deduplicate_findings(all_findings)
+        for mod, (bef, aft, rem) in dedup_stats.items():
+            if rem > 0:
+                output.log_progress(f"Dedup [{mod}]: {bef} -> {aft} ({rem} removed)")
+
         report = {
             "scan_time": datetime.now().isoformat(),
             "target": target,
             "modules": modules_ran,
-            "findings": all_findings,
+            "findings": report_findings,
         }
         if self.discovered_urls:
             report["discovered_urls"] = len(self.discovered_urls)

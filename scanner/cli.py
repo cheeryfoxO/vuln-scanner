@@ -9,6 +9,7 @@ from scanner.core.request import RequestHandler
 from scanner.core.output import Output
 from scanner.core.report import generate_html
 from scanner.core.presets import apply_preset, save_user_preset, list_presets
+from scanner.core.notify import Notifier
 
 
 class _TrackedAction(argparse.Action):
@@ -82,6 +83,10 @@ def _build_parser():
                       help="File with target URLs (one per line) for batch scanning")
     scan.add_argument("--save-preset", metavar="NAME",
                       help="Save current config as a named preset")
+    scan.add_argument("--notify-telegram", metavar="BOT_TOKEN:CHAT_ID",
+                      help="Send scan results via Telegram (e.g., '123:abc')")
+    scan.add_argument("--notify-webhook", metavar="URL",
+                      help="Send scan results to a webhook URL (e.g., 'https://hooks.slack.com/...')")
 
     # list command
     subparsers.add_parser("list", help="List available modules")
@@ -122,6 +127,36 @@ def _build_parser():
     web.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
 
     return parser
+
+
+def _build_notifier(args):
+    """Create and configure a Notifier from CLI args. Returns Notifier or None."""
+    notify_telegram = getattr(args, "notify_telegram", None)
+    notify_webhook = getattr(args, "notify_webhook", None)
+
+    if not notify_telegram and not notify_webhook:
+        return None
+
+    notifier = Notifier()
+    if notify_telegram:
+        if ":" not in notify_telegram:
+            print(f"Warning: --notify-telegram must be 'bot_token:chat_id', got: {notify_telegram}")
+        else:
+            bot_token, chat_id = notify_telegram.split(":", 1)
+            notifier.add_telegram(bot_token, chat_id)
+    if notify_webhook:
+        notifier.add_webhook(notify_webhook)
+    return notifier
+
+
+def _do_notify(notifier, target, report):
+    """Send notifications and print status for each channel."""
+    if notifier is None:
+        return
+    results = notifier.send(target, report)
+    for ch_type, success, msg in results:
+        status = "OK" if success else "FAIL"
+        print(f"  Notify [{ch_type}]: {status} -- {msg}")
 
 
 def main():
@@ -188,6 +223,10 @@ def main():
 
         total = sum(len(v) for v in report.get("findings", {}).values())
         print(f"Passive scan complete. {total} findings from {report.get('scanned_targets', 0)} targets.")
+
+        notifier = _build_notifier(args)
+        _do_notify(notifier, args.file, report)
+
         return
 
     if args.command == "web":
@@ -234,6 +273,7 @@ def main():
 
         all_reports = []
         total_findings = 0
+        notifier = _build_notifier(args)
 
         for i, target in enumerate(targets, 1):
             print(f"[{i}/{len(targets)}] Scanning {target} ...")
@@ -273,6 +313,7 @@ def main():
             t = sum(len(v) for v in report["findings"].values())
             total_findings += t
             print(f"  Scan complete. {t} findings across {len(report['modules'])} modules.")
+            _do_notify(notifier, target, report)
 
         print(f"\nBatch scan done: {len(targets)} targets, {total_findings} total findings")
 
@@ -307,6 +348,8 @@ def main():
             for rep in all_reports:
                 for mod_name, findings in rep["findings"].items():
                     merged_findings.setdefault(mod_name, []).extend(findings)
+            from scanner.core.dedup import deduplicate_findings
+            merged_findings, dedup_stats = deduplicate_findings(merged_findings)
             merged_report = {
                 "scan_time": datetime.now().isoformat(),
                 "target": f"Batch ({len(targets)} targets)",
@@ -375,6 +418,9 @@ def main():
             depth=getattr(args, "depth", 1),
         )
         print(f"Preset saved: {save_name}")
+
+    notifier = _build_notifier(args)
+    _do_notify(notifier, args.target, report)
 
 
 if __name__ == "__main__":
