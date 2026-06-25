@@ -15,10 +15,13 @@ _SEVERITY_MAP = {
     "stored_xss": ("high", {}),
     "ssrf": ("high", {}),
     "cors": ("high", {}),  # individual findings may override
+    "jwt": ("high", {}),   # individual findings have explicit severity
+    "idor": ("high", {}),  # individual findings have explicit severity
     "csrf": ("medium", {}),
     "redirect": ("medium", {}),
     "headers": ("low", {}),
     "dirscan": ("low", {}),
+    "fingerprint": ("info", {}),
     "params": ("info", {}),
     "subdomain": ("info", {}),
 }

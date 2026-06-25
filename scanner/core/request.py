@@ -151,7 +151,6 @@ class RequestHandler:
                 time.sleep(wait)
                 continue
             return resp
-        return resp  # last attempt, return as-is
 
     def get(self, url, **kwargs):
         """GET request with automatic UA, rate limiting, and timeout."""

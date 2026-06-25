@@ -112,7 +112,7 @@ class Engine:
                         )
                     all_findings[result["module"]] = findings
                     modules_ran.append(name)
-                    output.log_progress(f"✓ {name} complete")
+                    output.log_progress(f"[OK] {name} complete")
                 except Exception as e:
                     output.log_progress(f"Module {name} failed: {e}")
 

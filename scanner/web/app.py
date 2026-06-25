@@ -122,7 +122,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <body>
 <div class="header">
   <h1>🛡️ Vuln Scanner</h1>
-  <span class="ver">16 modules · 258 tests</span>
+  <span class="ver">18 modules · 273 tests</span>
   <span id="conn-status" class="badge badge-ok" style="margin-left:auto">● connected</span>
 </div>
 <div class="main">
@@ -206,7 +206,8 @@ const MODULES = [
   "subdomain","dirscan","params",
   "sqli","xss","dom_xss","stored_xss",
   "cmdi","lfi","redirect",
-  "ssrf","csrf","headers","cors","ssti","fingerprint"
+  "ssrf","csrf","headers","cors","ssti",
+  "fingerprint","jwt","idor"
 ];
 
 // Init module checkboxes
@@ -360,7 +361,7 @@ function getSeverity(finding, mod) {
   if (finding.severity) return finding.severity;
   const map = {sqli:'critical', cmdi:'critical', ssti:'critical',
                lfi:'high', xss:'high', dom_xss:'high', stored_xss:'high',
-               ssrf:'high', cors:'high',
+               ssrf:'high', cors:'high', jwt:'high', idor:'high',
                csrf:'medium', redirect:'medium',
                headers:'low', dirscan:'low',
                params:'info', subdomain:'info', fingerprint:'info'};
@@ -378,7 +379,7 @@ function renderFindings() {
 
   tbody.innerHTML = filtered.map(({finding, module}) => {
     const sev = getSeverity(finding, module);
-    const type = finding.type || finding.get ? finding.get('type', '') : '';
+    const type = finding.type || '';
     const target = finding.url || finding.host || finding.form_action || '';
     const evidence = (finding.evidence || finding.description || '').substring(0, 100);
     const poc = finding.poc || '';
@@ -489,7 +490,7 @@ def create_app():
             def log_finding(self, module_name, finding):
                 sev_map = {"sqli":"critical", "cmdi":"critical", "ssti":"critical",
                            "lfi":"high", "xss":"high", "dom_xss":"high", "stored_xss":"high",
-                           "ssrf":"high", "cors":"high",
+                           "ssrf":"high", "cors":"high", "jwt":"high", "idor":"high",
                            "csrf":"medium", "redirect":"medium",
                            "headers":"low", "dirscan":"low",
                            "params":"info", "subdomain":"info", "fingerprint":"info"}

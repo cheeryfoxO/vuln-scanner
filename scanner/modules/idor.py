@@ -97,40 +97,46 @@ def _extract_title(html):
 
 
 def _compare_responses(resp_a, resp_b, note=""):
-    """Compare two responses for IDOR signals. Returns finding dict or None."""
+    """Compare two responses for IDOR signals. Returns finding dict or None.
+
+    resp_a is the baseline (original URL), resp_b is the variant (modified ID).
+    """
     fp_a = _fingerprint_response(resp_a)
     fp_b = _fingerprint_response(resp_b)
 
-    # Strong signal: same status, same body hash → identical response for different ID
-    if (fp_a["status"] == fp_b["status"] == 200 and
-            fp_a["hash"] == fp_b["hash"] and
-            fp_a["len"] > 100):
+    # Both must return 200 with meaningful content to compare
+    if fp_a["status"] != 200 or fp_b["status"] != 200:
+        return None
+    if fp_a["len"] <= 100:
+        return None
+
+    # ID 0 or 1 access: often reveals admin/root data (check first)
+    if note:
+        id_match = re.search(r"→\s*(\d+)", note)
+        if id_match and int(id_match.group(1)) in (0, 1):
+            return {
+                "type": "idor_root_id_access",
+                "severity": "high",
+                "desc": f"Access to ID 0/1 succeeded — often reserved for admin or system ({note})",
+                "evidence": f"Status: {fp_b['status']}, Size: {fp_b['len']}B, Title: {fp_b['title'][:80]}",
+            }
+
+    # Strong signal: same hash for different IDs → no access control
+    if fp_a["hash"] == fp_b["hash"]:
         return {
             "type": "idor_identical_response",
             "severity": "high",
-            "desc": f"Same response for different IDs — no access control{(' (' + note + ')') if note else ''}",
+            "desc": f"Same response for different IDs — no access control ({note})",
             "evidence": f"Status: {fp_a['status']}, Size: {fp_a['len']}B, Hash: {fp_a['hash'][:12]}",
         }
 
-    # Medium signal: same status, similar size (±5%), different content
-    if (fp_a["status"] == fp_b["status"] == 200 and
-            fp_a["len"] > 100 and
-            abs(fp_a["len"] - fp_b["len"]) < fp_a["len"] * 0.05 and
-            fp_a["hash"] != fp_b["hash"]):
+    # Medium signal: similar size (±5%) but different content → possible data leak
+    if abs(fp_a["len"] - fp_b["len"]) < fp_a["len"] * 0.05:
         return {
             "type": "idor_similar_response",
             "severity": "medium",
-            "desc": f"Similar response size for different IDs — possible data leak{(' (' + note + ')') if note else ''}",
+            "desc": f"Similar response size for different IDs — possible data leak ({note})",
             "evidence": f"Status: {fp_a['status']}, Sizes: {fp_a['len']}B vs {fp_b['len']}B",
-        }
-
-    # ID 0 or 1 access: often reveals admin/root data
-    if fp_a["status"] == 200 and fp_a["len"] > 100 and note and ("→ 0" in note or "→ 1" in note):
-        return {
-            "type": "idor_root_id_access",
-            "severity": "high",
-            "desc": f"Access to ID 0/1 succeeded — often reserved for admin or system{(' (' + note + ')') if note else ''}",
-            "evidence": f"Status: {fp_a['status']}, Size: {fp_a['len']}B, Title: {fp_a['title'][:80]}",
         }
 
     return None
@@ -151,29 +157,52 @@ class IdorModule(BaseModule):
         if not re.search(r"\d", target):
             output.log_progress("No numeric IDs in URL — skipping ID enumeration.")
             output.log_progress("Provide a URL with IDs: /user/123/profile or ?id=456")
-        else:
-            output.log_progress(f"Testing ID enumeration on {target}")
-            variants = _generate_idor_urls(target)
-            output.log_progress(f"  Generated {len(variants)} variant URLs")
+            return {"module": self.name, "findings": findings}
 
-            for var_url, note in variants:
-                try:
-                    resp = request_handler.get(var_url)
-                    if resp.status_code == 200 and len(resp.text or "") > 100:
-                        # Compare with baseline (original URL)
-                        finding = _compare_responses(resp, resp, note)
-                        if finding or resp.status_code == 200:
-                            # Just log that we got a 200 on a modified ID
-                            finding = {
-                                "type": "idor_id_modified",
-                                "severity": "info",
-                                "desc": f"Modified ID returned 200 — manual verification needed ({note})",
-                                "evidence": f"URL: {var_url}, Status: {resp.status_code}, Size: {len(resp.text or '')}B",
-                            }
-                        if finding and finding["severity"] != "info":
-                            findings.append(finding)
-                            output.log_finding(self.name, finding)
-                except Exception:
-                    pass
+        output.log_progress(f"Testing ID enumeration on {target}")
 
+        # Phase 1: fetch original URL as baseline
+        output.log_progress("  Fetching baseline (original URL)...")
+        try:
+            baseline_resp = request_handler.get(target)
+        except Exception:
+            output.log_progress("  Failed to fetch original URL — aborting IDOR check")
+            return {"module": self.name, "findings": findings}
+
+        baseline_len = len(baseline_resp.text or "")
+        output.log_progress(f"  Baseline: status={baseline_resp.status_code}, size={baseline_len}B")
+
+        # Phase 2: generate and test variant URLs
+        variants = _generate_idor_urls(target)
+        output.log_progress(f"  Testing {len(variants)} variant URLs...")
+
+        for var_url, note in variants:
+            try:
+                resp = request_handler.get(var_url)
+                if resp.status_code != 200:
+                    continue
+                if len(resp.text or "") < 50:
+                    continue
+
+                # Compare variant response against baseline
+                result = _compare_responses(baseline_resp, resp, note)
+                if result:
+                    findings.append(result)
+                    output.log_finding(self.name, result)
+
+                # Also flag any successful ID modification for manual review
+                elif abs(len(resp.text or "") - baseline_len) > baseline_len * 0.1:
+                    info_finding = {
+                        "type": "idor_different_response",
+                        "severity": "medium",
+                        "desc": f"Different response for modified ID — possible data leak ({note})",
+                        "evidence": f"URL: {var_url}, Status: {resp.status_code}, Sizes: baseline={baseline_len}B vs variant={len(resp.text or '')}B",
+                    }
+                    findings.append(info_finding)
+                    output.log_finding(self.name, info_finding)
+
+            except Exception:
+                pass
+
+        output.log_progress(f"IDOR done: {len(findings)} potential issues found")
         return {"module": self.name, "findings": findings}

@@ -117,6 +117,13 @@ def build_curl(finding, module_name, cookies=None, extra_headers=None, target=No
     elif module_name == "fingerprint":
         parts.append(_escape_shell(url))
 
+    elif module_name == "params":
+        parts.append(_escape_shell(url))
+        parts.insert(1, "-X GET")
+
+    elif module_name in ("jwt", "idor"):
+        parts.append(_escape_shell(url))
+
     else:
         # Generic fallback
         param = finding.get("parameter", "")
