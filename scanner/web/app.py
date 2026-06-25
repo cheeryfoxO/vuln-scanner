@@ -122,7 +122,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <body>
 <div class="header">
   <h1>🛡️ Vuln Scanner</h1>
-  <span class="ver">18 modules · 273 tests</span>
+  <span class="ver">21 modules · 379 tests</span>
   <span id="conn-status" class="badge badge-ok" style="margin-left:auto">● connected</span>
 </div>
 <div class="main">
@@ -207,7 +207,8 @@ const MODULES = [
   "sqli","xss","dom_xss","stored_xss",
   "cmdi","lfi","redirect",
   "ssrf","csrf","headers","cors","ssti",
-  "fingerprint","jwt","idor"
+  "fingerprint","jwt","idor",
+  "js_endpoints","s3","graphql"
 ];
 
 // Init module checkboxes
@@ -362,6 +363,7 @@ function getSeverity(finding, mod) {
   const map = {sqli:'critical', cmdi:'critical', ssti:'critical',
                lfi:'high', xss:'high', dom_xss:'high', stored_xss:'high',
                ssrf:'high', cors:'high', jwt:'high', idor:'high',
+               graphql:'high', s3:'high', js_endpoints:'medium',
                csrf:'medium', redirect:'medium',
                headers:'low', dirscan:'low',
                params:'info', subdomain:'info', fingerprint:'info'};
@@ -491,6 +493,7 @@ def create_app():
                 sev_map = {"sqli":"critical", "cmdi":"critical", "ssti":"critical",
                            "lfi":"high", "xss":"high", "dom_xss":"high", "stored_xss":"high",
                            "ssrf":"high", "cors":"high", "jwt":"high", "idor":"high",
+                           "graphql":"high", "s3":"high", "js_endpoints":"medium",
                            "csrf":"medium", "redirect":"medium",
                            "headers":"low", "dirscan":"low",
                            "params":"info", "subdomain":"info", "fingerprint":"info"}

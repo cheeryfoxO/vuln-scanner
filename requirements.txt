@@ -1,0 +1,4 @@
+requests>=2.31
+colorama>=0.4
+tqdm>=4.66
+flask>=3.0

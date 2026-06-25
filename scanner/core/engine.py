@@ -9,7 +9,7 @@ from scanner.core.crawler import Crawler
 from scanner.core.poc import inject_poc_into_finding
 
 # Modules that don't send attack payloads — safe to run in parallel
-NON_INVASIVE = {"subdomain", "dirscan", "params", "headers", "cors", "csrf", "fingerprint"}
+NON_INVASIVE = {"subdomain", "dirscan", "params", "headers", "cors", "csrf", "fingerprint", "js_endpoints", "s3"}
 
 
 class Engine:

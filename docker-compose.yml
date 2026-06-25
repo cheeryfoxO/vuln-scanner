@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  scanner:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./wordlists:/app/wordlists
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Default: web UI mode
+    command: web --host 0.0.0.0 --port 8085
+    ports:
+      - "8085:8085"
+
+  # For batch scanning via CLI
+  scanner-batch:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./targets.txt:/app/targets.txt:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: scan -i /app/targets.txt --preset quick -v
+    profiles:
+      - batch

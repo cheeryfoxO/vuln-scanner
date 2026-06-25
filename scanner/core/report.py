@@ -17,6 +17,9 @@ _SEVERITY_MAP = {
     "cors": ("high", {}),  # individual findings may override
     "jwt": ("high", {}),   # individual findings have explicit severity
     "idor": ("high", {}),  # individual findings have explicit severity
+    "graphql": ("high", {}),
+    "s3": ("high", {}),
+    "js_endpoints": ("medium", {}),
     "csrf": ("medium", {}),
     "redirect": ("medium", {}),
     "headers": ("low", {}),

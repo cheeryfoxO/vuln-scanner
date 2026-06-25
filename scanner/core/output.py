@@ -172,6 +172,27 @@ class Output:
             desc = finding.get("desc", "")[:100]
             print(f"[{module_name}] {sev_color}{typ}{self._reset()} "
                   f"— {desc}")
+        elif module_name == "s3":
+            provider = finding.get("provider", "?")
+            bucket = finding.get("bucket", "?")
+            sev = finding.get("severity", "info")
+            sev_color = Fore.RED if sev == "critical" else Fore.YELLOW if sev == "high" else ""
+            desc = finding.get("desc", "")[:100]
+            print(f"[{module_name}] {sev_color}{sev}{self._reset()} [{provider}] "
+                  f"{bucket} — {desc}")
+        elif module_name == "graphql":
+            typ = finding.get("type", "?")
+            sev = finding.get("severity", "info")
+            sev_color = Fore.RED if sev == "critical" else Fore.YELLOW if sev == "high" else ""
+            url = finding.get("url", finding.get("endpoint", ""))
+            desc = finding.get("desc", "")[:100]
+            print(f"[{module_name}] {sev_color}{typ}{self._reset()} "
+                  f"— {url} — {desc}")
+        elif module_name == "js_endpoints":
+            typ = finding.get("type", "?")
+            sev = finding.get("severity", "info")
+            evidence = finding.get("evidence", "")[:80]
+            print(f"[{module_name}] {typ}: {evidence}")
 
         # PoC display (verbose or if available)
         poc = finding.get("poc", "")

@@ -2,6 +2,7 @@
 import argparse
 import json
 import sys
+from datetime import datetime
 
 from scanner.core.engine import Engine
 from scanner.core.request import RequestHandler
@@ -33,9 +34,12 @@ from scanner.modules.ssti import SstiModule
 from scanner.modules.fingerprint import FingerprintModule
 from scanner.modules.jwt import JwtModule
 from scanner.modules.idor import IdorModule
+from scanner.modules.js_endpoints import JsEndpointsModule
+from scanner.modules.s3 import S3Module
+from scanner.modules.graphql import GraphqlModule
 
 
-MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule, SstiModule, FingerprintModule, JwtModule, IdorModule]
+MODULE_CLASSES = [SubdomainModule, DirscanModule, ParamsModule, SqliModule, XssModule, DomXssModule, StoredXssModule, CmdiModule, LfiModule, RedirectModule, SsrfModule, CsrfModule, HeadersModule, CorsModule, SstiModule, FingerprintModule, JwtModule, IdorModule, JsEndpointsModule, S3Module, GraphqlModule]
 
 
 def _build_parser():
@@ -48,7 +52,7 @@ def _build_parser():
 
     # scan command
     scan = subparsers.add_parser("scan", help="Run scan against a target")
-    scan.add_argument("target", help="Target domain or URL (e.g., example.com or https://example.com)")
+    scan.add_argument("target", nargs="?", help="Target domain or URL (e.g., example.com or https://example.com)")
     scan.add_argument("-m", "--modules", default="all",
                       help="Comma-separated module names (subdomain,dirscan,params) or 'all'")
     scan.add_argument("-t", "--threads", type=int, default=10, action=_TrackedAction,
@@ -74,6 +78,8 @@ def _build_parser():
     scan.add_argument("--resume", metavar="FILE",
                       help="Resume interrupted scan from JSON output file")
     scan.add_argument("--preset", help="Load named scan preset (quick, recon, api, injection, owasp, full)")
+    scan.add_argument("-i", "--input", metavar="FILE",
+                      help="File with target URLs (one per line) for batch scanning")
     scan.add_argument("--save-preset", metavar="NAME",
                       help="Save current config as a named preset")
 
@@ -211,6 +217,108 @@ def main():
                 extra_headers[k.strip()] = v.strip()
 
     proxy = getattr(args, "proxy", None)
+
+    # Require target unless batch input file is provided
+    if not getattr(args, "input", None) and not args.target:
+        parser.error("the following arguments are required: target")
+
+    # ── Batch scanning ────────────────────────────────────────────────────
+    if getattr(args, "input", None):
+        with open(args.input, encoding="utf-8") as f:
+            targets = [line.strip() for line in f
+                       if line.strip() and not line.strip().startswith("#")]
+
+        if not targets:
+            print("No targets found in input file.")
+            return
+
+        all_reports = []
+        total_findings = 0
+
+        for i, target in enumerate(targets, 1):
+            print(f"[{i}/{len(targets)}] Scanning {target} ...")
+
+            rh = RequestHandler(
+                timeout=args.timeout,
+                delay=getattr(args, "delay", 0),
+                cookies=getattr(args, "cookie", None),
+                extra_headers=extra_headers or None,
+                proxy=proxy,
+            )
+            out = Output(
+                verbose=args.verbose,
+                use_color=not args.no_color,
+                json_path=None,
+            )
+
+            if proxy:
+                out.log_progress(f"Using proxy: {proxy} (SSL verify disabled)")
+            out.log_progress(f"Starting scan against {target}")
+
+            # Reset engine per-target state
+            engine.discovered_urls = []
+
+            try:
+                report = engine.run(
+                    target, module_names, rh, out,
+                    threads=args.threads,
+                    scope=getattr(args, "scope", None),
+                    depth=getattr(args, "depth", 1),
+                )
+            except Exception as e:
+                print(f"  Error scanning {target}: {e}")
+                continue
+
+            all_reports.append(report)
+            t = sum(len(v) for v in report["findings"].values())
+            total_findings += t
+            print(f"  Scan complete. {t} findings across {len(report['modules'])} modules.")
+
+        print(f"\nBatch scan done: {len(targets)} targets, {total_findings} total findings")
+
+        # Combined JSON report
+        if args.output:
+            combined = {
+                "scan_time": datetime.now().isoformat(),
+                "batch_mode": True,
+                "total_targets": len(targets),
+                "total_findings": total_findings,
+                "targets": [],
+            }
+            for rep in all_reports:
+                entry = {
+                    "target": rep["target"],
+                    "scan_time": rep["scan_time"],
+                    "modules": rep["modules"],
+                    "findings": rep["findings"],
+                }
+                if "discovered_urls" in rep:
+                    entry["discovered_urls"] = rep["discovered_urls"]
+                combined["targets"].append(entry)
+
+            with open(args.output, "w", encoding="utf-8") as f:
+                json.dump(combined, f, indent=2, ensure_ascii=False)
+            print(f"JSON report saved to {args.output}")
+
+        # Combined HTML report
+        report_path = getattr(args, "report", None)
+        if report_path:
+            merged_findings = {}
+            for rep in all_reports:
+                for mod_name, findings in rep["findings"].items():
+                    merged_findings.setdefault(mod_name, []).extend(findings)
+            merged_report = {
+                "scan_time": datetime.now().isoformat(),
+                "target": f"Batch ({len(targets)} targets)",
+                "modules": list(merged_findings.keys()),
+                "findings": merged_findings,
+            }
+            generate_html(f"Batch ({len(targets)} targets)", merged_report, report_path)
+            print(f"HTML report saved to {report_path}")
+
+        return
+
+    # ── Single-target scan ─────────────────────────────────────────────────
 
     request_handler = RequestHandler(
         timeout=args.timeout,

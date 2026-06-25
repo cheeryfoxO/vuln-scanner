@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+.gitignore
+*.checkpoint.json
+output/
+wordlists/
+.env
+*.log
